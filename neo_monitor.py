@@ -49,14 +49,24 @@ b = BPF(text = bpf_text)
 socket_fnname = b.get_syscall_fnname("socket")
 b.attach_kprobe(event=socket_fnname, fn_name="syscall__socket")
 
-print("%-12s %-10s %-10s %s" % ("TS(ns)", "PPID", "PID", "CMD"))
+print("%-12s %-10s %-10s %-10s %-10s" % ("TS(ns)", "PPID", "PID", "PCMD", "CMD"))
 
 start_ts = time.time_ns()
+
+def get_name(pid):
+	try:
+		with open("/proc/%d/status" % pid) as status:
+			for line in status:
+				if (line.startswith("Name")):
+					return bytes(line.split()[1], encoding="utf-8")
+	except IOError:
+		pass
+	return bytes("N/A", encoding="utf-8")
 
 def print_event(cpu, data, size):
 	event = b["events"].event(data)
 	if (event.domain == 16 and event.protocol == 0): # AF_NETLINK - 16 NETLINK_ROUTE - 0
-		printb(b"%-12d %-10d %-10d %s" % (time.time_ns() - start_ts, event.ppid, event.pid, event.comm))
+		printb(b"%-12d %-10d %-10d %-10s %-10s" % (time.time_ns() - start_ts, event.ppid, event.pid, get_name(event.ppid), event.comm))
 
 # loop with callback to print_event
 b["events"].open_perf_buffer(print_event)
