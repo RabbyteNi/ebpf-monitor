@@ -12,6 +12,7 @@ from time import strftime
 
 bpf_text = """
 #define ARGSIZE 128
+#define MAXARG 20
 
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
@@ -102,9 +103,9 @@ b.attach_kprobe(event=execve_fnname, fn_name="syscall__execve")
 b.attach_kretprobe(event=execve_fnname, fn_name="do_ret_sys_execve")
 
 # Headers
-print("%-8s %-16s %-7s %-7s %s" % ("TIME(s)" "PCOMM", "PID", "PPID", "ARGS"))
+print("%-12s %-10s %-10s %-10s %-10s" % ("TS(ns)", "PPID", "PCMD", "PID", "CMD"))
 
-start_ts = time.time()
+start_ts = time.time_ns()
 argv = defaultdict(list)
 
 class EventType(object):
@@ -114,14 +115,14 @@ class EventType(object):
 regex_pattern = "ip route (add|del)"
 
 def print_event(cpu, data, size):
-	event = b["events"].event(data)
-	if event.type == EventType.EVENT_ARG:
-		argv[event.pid].append(event.argv)
-	elif event.type == EventType.EVENT_RET:
-		if (re.search(bytes(regex_pattern), b' '.join(argv[event.pid]))):
-			argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-			printb(b"%-8.3f %-16s %-7d %-7s %s" % (time.time()-start_ts, event.comm, event.pid, event.ppid, argv_text))
-		try:
+    event = b["events"].event(data)
+    if event.type == EventType.EVENT_ARG:
+        argv[event.pid].append(event.argv)
+    elif event.type == EventType.EVENT_RET:
+        if (re.search(bytes(regex_pattern, encoding='utf-8'), b' '.join(argv[event.pid]))):
+            argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
+            printb(b"%-12d %-10d %-10s %-10d %-10s" % (time.time_ns() - start_ts, event.ppid, event.comm, event.pid, argv_text))
+        try:
             del(argv[event.pid])
         except Exception:
             pass
