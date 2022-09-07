@@ -111,13 +111,16 @@ class EventType(object):
     EVENT_ARG = 0
     EVENT_RET = 1
 
+regex_pattern = "ip route (add|del)"
+
 def print_event(cpu, data, size):
 	event = b["events"].event(data)
 	if event.type == EventType.EVENT_ARG:
 		argv[event.pid].append(event.argv)
 	elif event.type == EventType.EVENT_RET:
-		argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-		printb(b"%-8.3f %-16s %-7d %-7s %s" % (time.time()-start_ts, event.comm, event.pid, event.ppid, argv_text))
+		if (re.search(bytes(regex_pattern), b' '.join(argv[event.pid]))):
+			argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
+			printb(b"%-8.3f %-16s %-7d %-7s %s" % (time.time()-start_ts, event.comm, event.pid, event.ppid, argv_text))
 		try:
             del(argv[event.pid])
         except Exception:
